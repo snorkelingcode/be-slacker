@@ -8,14 +8,15 @@ const postRoutes = require('./routes/posts');
 
 const app = express();
 
-// Comprehensive CORS configuration
+// Connect to MongoDB
+connectDB();
+
 const corsOptions = {
     origin: [
-        'https://fe-slacker.vercel.app',
-        'https://fe-slacker-git-main-snorkelingcodes-projects.vercel.app',
-        'https://fe-slacker-drw0hwhl1-snorkelingcodes-projects.vercel.app',
-        'http://localhost:3000',
-        '*'  // Use carefully in production
+        "https://fe-slacker.vercel.app",
+        "https://fe-slacker-git-main-snorkelingcodes-projects.vercel.app",
+        "https://fe-slacker-drw0hwhl1-snorkelingcodes-projects.vercel.app",
+        "http://localhost:3000"
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -29,33 +30,35 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 
-// CORS middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
+app.options('*', cors(corsOptions));
 
-// Body parsing middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Existing request logging middleware
+// Request logging
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
     next();
 });
 
-// Rest of your existing server.js code remains the same...
+// Register routes
+app.use('/api/users', userRoutes);
+app.use('/api/posts', postRoutes);
 
-// Global error handler (updated)
+// Health check route
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+// Error handler
 app.use((err, req, res, next) => {
-    console.error('Unhandled Error:', {
+    console.error('Error:', {
         message: err.message,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         timestamp: new Date().toISOString()
     });
     
-    // Specific CORS error handling
     if (err.name === 'CorsError') {
         return res.status(403).json({
             error: 'CORS Error',
@@ -68,6 +71,11 @@ app.use((err, req, res, next) => {
         path: req.path,
         timestamp: new Date().toISOString()
     });
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
 
 module.exports = app;
