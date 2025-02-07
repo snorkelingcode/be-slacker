@@ -16,7 +16,8 @@ const corsOptions = {
         "https://fe-slacker.vercel.app",
         "https://fe-slacker-git-main-snorkelingcodes-projects.vercel.app",
         "https://fe-slacker-drw0hwhl1-snorkelingcodes-projects.vercel.app",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://localhost:5000"
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -24,26 +25,40 @@ const corsOptions = {
         "X-Requested-With",
         "Content-Type",
         "Accept",
-        "Authorization"
+        "Authorization",
+        "Access-Control-Allow-Origin"
     ],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    preflightContinue: true
 };
 
+// Enable CORS for all routes
 app.use(cors(corsOptions));
+
+// Handle OPTIONS requests
 app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Add headers before any routes
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+    } else {
+        next();
+    }
+});
+
 // Root route
 app.get('/', (req, res) => {
     res.json({ message: 'Server is running' });
-});
-
-// Test route
-app.get('/test', (req, res) => {
-    res.json({ message: 'Test endpoint working' });
 });
 
 // Request logging
@@ -68,13 +83,6 @@ app.use((err, req, res, next) => {
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         timestamp: new Date().toISOString()
     });
-    
-    if (err.name === 'CorsError') {
-        return res.status(403).json({
-            error: 'CORS Error',
-            message: 'Access blocked by CORS policy'
-        });
-    }
     
     res.status(err.status || 500).json({
         error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
