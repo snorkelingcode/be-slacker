@@ -11,36 +11,20 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-const allowedOrigins = [
-    "https://fe-slacker.vercel.app",
-    "https://fe-slacker-git-main-snorkelingcodes-projects.vercel.app",
-    "https://fe-slacker-drw0hwhl1-snorkelingcodes-projects.vercel.app",
-    "http://localhost:3000"
-];
+// CORS Setup
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', 'https://fe-slacker.vercel.app');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    next();
+});
 
-// CORS configuration with dynamic origin checking
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Check if origin is in allowedOrigins or if it's undefined (like postman requests)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-    credentials: true,
-    optionsSuccessStatus: 200,
-    preflightContinue: false
-};
-
-// Enable CORS for all routes
-app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
-
+// Parse JSON bodies
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -49,11 +33,9 @@ app.get('/', (req, res) => {
     res.json({ message: 'Server is running' });
 });
 
-// Request logging middleware
+// Request logging
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    // Log origin for debugging
-    console.log('Origin:', req.headers.origin);
     next();
 });
 
@@ -66,7 +48,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
     console.error('Error:', {
         message: err.message,
@@ -74,10 +56,10 @@ app.use((err, req, res, next) => {
         timestamp: new Date().toISOString()
     });
     
-    if (err.message === 'Not allowed by CORS') {
+    if (err.name === 'CorsError') {
         return res.status(403).json({
             error: 'CORS Error',
-            message: 'Origin not allowed'
+            message: 'Access blocked by CORS policy'
         });
     }
     
