@@ -3,73 +3,71 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const userRoutes = require('./routes/users');
+const postRoutes = require('./routes/posts');
+const { ErrorUtils } = require('./utils/backendUtils');
 
 const app = express();
 
-// Optimized CORS configuration
+// Connect to MongoDB
+connectDB();
+
+// CORS Setup with more specific configuration
 const corsOptions = {
     origin: [
         'https://fe-slacker.vercel.app', 
-        'http://localhost:3000'
+        'http://localhost:3000'  // For local development
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    maxAge: 86400 // Cache preflight requests for 24 hours
+    credentials: true
 };
-
 app.use(cors(corsOptions));
 
-// Optimize JSON parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Simplified logging for production
+// Detailed logging middleware
 app.use((req, res, next) => {
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`${req.method} ${req.path}`);
-    }
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
     next();
 });
 
-// Connect to MongoDB before handling routes
-app.use(async (req, res, next) => {
-    try {
-        if (mongoose.connection.readyState !== 1) {
-            await connectDB();
-        }
-        next();
-    } catch (error) {
-        next(error);
-    }
+// Parse JSON bodies
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Root route
+app.get('/', (req, res) => {
+    res.json({ message: 'Slacker Backend is running' });
 });
 
-// Routes
-app.use('/api/users', require('./routes/users'));
-app.use('/api/posts', require('./routes/posts'));
+// Register routes
+app.use('/api/users', userRoutes);
+app.use('/api/posts', postRoutes);
 
-// Health check endpoint
+// Health check route
 app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'ok',
-        dbState: mongoose.connection.readyState
-    });
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Simplified error handler
+// Global error handler
 app.use((err, req, res, next) => {
-    console.error(err.message);
+    console.error('Unhandled Error:', err);
+    
+    const errorResponse = ErrorUtils.formatError(err, process.env.NODE_ENV === 'development');
+    
     res.status(err.status || 500).json({
-        message: process.env.NODE_ENV === 'production' 
-            ? 'Internal server error' 
-            : err.message
+        error: errorResponse,
+        path: req.path,
+        timestamp: new Date().toISOString()
     });
 });
 
-// Server startup
 const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
 }
 
 module.exports = app;
