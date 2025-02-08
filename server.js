@@ -50,24 +50,24 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Global error handler
 app.use((err, req, res, next) => {
-    console.error('Unhandled Error:', {
-        message: err.message,
-        name: err.name,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-
-    // Handle specific error types
-    if (err.name === 'MongoNetworkError') {
-        return res.status(503).json({
-            message: 'Database connection error',
-            error: 'Unable to connect to the database'
-        });
-    }
-
-    // Generic server error
+    console.error('Unhandled Error:', err);
+    
+    const errorResponse = ErrorUtils.formatError(err, process.env.NODE_ENV === 'development');
+    
     res.status(err.status || 500).json({
-        message: 'Internal server error',
-        error: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
+        error: errorResponse,
+        path: req.path,
+        timestamp: new Date().toISOString()
     });
 });
+
+const PORT = process.env.PORT || 3001;
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
