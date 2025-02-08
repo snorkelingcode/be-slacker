@@ -6,10 +6,23 @@ const connectDB = async () => {
             throw new Error('MONGODB_URI is not defined in environment variables');
         }
 
-        console.log('Connecting to MongoDB...');
-        const conn = await mongoose.connect(process.env.MONGODB_URI);
+        console.log('Attempting to connect to MongoDB...');
+        console.log('Connection URI:', process.env.MONGODB_URI.replace(/:[^:]*@/, ':****@'));
+
+        // Add connection options for better reliability
+        const connectionOptions = {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 10000, // Timeout after 10 seconds
+            socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+        };
+
+        const conn = await mongoose.connect(process.env.MONGODB_URI, connectionOptions);
         
         console.log(`✅ MongoDB Connected to host: ${conn.connection.host}`);
+        
+        // Detailed connection logging
+        console.log('Connection state:', mongoose.connection.readyState);
         
         // Test the connection by checking collections
         const collections = await mongoose.connection.db.listCollections().toArray();
@@ -26,25 +39,36 @@ const connectDB = async () => {
         return conn;
     } catch (error) {
         console.error('❌ MongoDB connection error:', error);
-        // Log more details about the error
-        if (error.name === 'MongooseError') {
-            console.error('Connection string:', process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 20) + '...' : 'undefined');
+        
+        // More detailed error logging
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        
+        // Log specific connection issues
+        if (error.name === 'MongoNetworkError') {
+            console.error('Network error connecting to MongoDB. Check your connection string and network.');
         }
-        process.exit(1);
+        
+        // Throw the error to be caught by the caller
+        throw error;
     }
 };
 
-// Add connection event listeners
+// Add more comprehensive connection event listeners
 mongoose.connection.on('connected', () => {
-    console.log('🟢 MongoDB connected');
+    console.log('🟢 Mongoose connected to MongoDB');
 });
 
 mongoose.connection.on('error', (err) => {
-    console.error('🔴 MongoDB error:', err);
+    console.error('🔴 Mongoose connection error:', err);
 });
 
 mongoose.connection.on('disconnected', () => {
-    console.log('🟡 MongoDB disconnected');
+    console.log('🟡 Mongoose disconnected from MongoDB');
+});
+
+mongoose.connection.on('reconnected', () => {
+    console.log('🔄 Mongoose reconnected to MongoDB');
 });
 
 // Handle application termination
