@@ -8,9 +8,15 @@ const postRoutes = require('./routes/posts');
 const { ErrorUtils } = require('./utils/backendUtils');
 
 const app = express();
+app.timeout = 120000;
 
 // Connect to MongoDB
-connectDB();
+connectDB('MONGODB_URI=mongodb+srv://daneknudsen3d:lXiZvWPXdnJLDmvs@slacker.lijv6.mongodb.net/slacker_db?retryWrites=true&w=majority').then(() => {
+    console.log('MongoDB connected successfully');
+}).catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+});
 
 // CORS Setup with more specific configuration
 const corsOptions = {

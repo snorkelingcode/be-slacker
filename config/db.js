@@ -3,17 +3,14 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
     try {
         console.log('Attempting to connect to MongoDB...');
-        const conn = await mongoose.connect(process.env.MONGODB_URI);
+        const conn = await mongoose.connect(process.env.MONGODB_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 60000, // Timeout after 60s
+            socketTimeoutMS: 60000,
+        });
+        
         console.log(`MongoDB Connected: ${conn.connection.host}`);
-        
-        // Test the connection
-        const collections = await mongoose.connection.db.listCollections().toArray();
-        console.log('Available collections:', collections.map(c => c.name));
-        
-        // Try to count users
-        const userCount = await mongoose.connection.db.collection('users').countDocuments();
-        console.log('Number of users in database:', userCount);
-        
         return conn;
     } catch (error) {
         console.error('MongoDB connection error:', error);
