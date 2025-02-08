@@ -1,137 +1,184 @@
 const express = require('express');
 const router = express.Router();
-const Post = require('../models/Post');
-const { ValidationUtils, ErrorUtils } = require('../utils/backendUtils');
+const { PrismaClient } = require('@prisma/client');
+const { ValidationUtils } = require('../utils/backendUtils');
+
+const prisma = new PrismaClient();
 
 // Create a new post
 router.post('/', async (req, res) => {
     try {
         const { walletAddress, content, mediaUrl, mediaType } = req.body;
         
-        // Validate inputs
+        // Validate wallet address and content
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         const sanitizedContent = ValidationUtils.sanitizeInput(content, 1000);
 
-        // Create new post
-        const post = new Post({
-            walletAddress: validatedWalletAddress,
-            content: sanitizedContent,
-            mediaUrl: mediaUrl || null,
-            mediaType: mediaType || null
+        // Find user by wallet address
+        const user = await prisma.user.findUnique({
+            where: { walletAddress: validatedWalletAddress }
         });
-        
-        await post.save();
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Create post
+        const post = await prisma.post.create({
+            data: {
+                content: sanitizedContent,
+                mediaUrl,
+                mediaType,
+                authorId: user.id
+            },
+            include: {
+                author: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            }
+        });
+
         res.status(201).json(post);
     } catch (error) {
         console.error('Error creating post:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
+        res.status(500).json({ message: error.message });
     }
 });
 
 // Get all posts
 router.get('/', async (req, res) => {
     try {
-        const posts = await Post.find()
-            .sort({ createdAt: -1 })
-            .limit(50);
+        const posts = await prisma.post.findMany({
+            include: {
+                author: true,
+                comments: {
+                    include: {
+                        author: true
+                    }
+                },
+                likes: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            take: 50
+        });
+
         res.json(posts);
     } catch (error) {
         console.error('Error fetching posts:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Get posts for a specific user
-router.get('/user/:walletAddress', async (req, res) => {
-    try {
-        const validatedWalletAddress = ValidationUtils.validateWalletAddress(req.params.walletAddress);
-        
-        const posts = await Post.find({ 
-            walletAddress: validatedWalletAddress 
-        }).sort({ createdAt: -1 });
-        
-        res.json(posts);
-    } catch (error) {
-        console.error('Error fetching user posts:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
-    }
-});
-
-// Like a post
+// Like/Unlike a post
 router.post('/:postId/like', async (req, res) => {
     try {
         const { walletAddress } = req.body;
+        const { postId } = req.params;
+
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         
-        const post = await Post.findById(req.params.postId);
-        
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
+        const user = await prisma.user.findUnique({
+            where: { walletAddress: validatedWalletAddress }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
-        
-        const likeIndex = post.likes.indexOf(validatedWalletAddress);
-        if (likeIndex > -1) {
-            post.likes.splice(likeIndex, 1);
+
+        // Check if like exists
+        const existingLike = await prisma.like.findUnique({
+            where: {
+                userId_postId: {
+                    userId: user.id,
+                    postId: postId
+                }
+            }
+        });
+
+        if (existingLike) {
+            // Unlike
+            await prisma.like.delete({
+                where: {
+                    userId_postId: {
+                        userId: user.id,
+                        postId: postId
+                    }
+                }
+            });
         } else {
-            post.likes.push(validatedWalletAddress);
+            // Like
+            await prisma.like.create({
+                data: {
+                    userId: user.id,
+                    postId: postId
+                }
+            });
         }
-        
-        await post.save();
-        res.json(post);
+
+        const updatedPost = await prisma.post.findUnique({
+            where: { id: postId },
+            include: {
+                likes: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            }
+        });
+
+        res.json(updatedPost);
     } catch (error) {
         console.error('Error liking post:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Add a comment to a post
+// Add comment to post
 router.post('/:postId/comment', async (req, res) => {
     try {
         const { walletAddress, content } = req.body;
-        
+        const { postId } = req.params;
+
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         const sanitizedContent = ValidationUtils.sanitizeInput(content, 500);
-        
-        const post = await Post.findById(req.params.postId);
-        
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-        
-        post.comments.push({ 
-            walletAddress: validatedWalletAddress, 
-            content: sanitizedContent 
+
+        const user = await prisma.user.findUnique({
+            where: { walletAddress: validatedWalletAddress }
         });
-        
-        await post.save();
-        res.json(post);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const comment = await prisma.comment.create({
+            data: {
+                content: sanitizedContent,
+                authorId: user.id,
+                postId: postId
+            },
+            include: {
+                author: true
+            }
+        });
+
+        res.json(comment);
     } catch (error) {
         console.error('Error adding comment:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
-    }
-});
-
-// Delete a post
-router.delete('/:postId', async (req, res) => {
-    try {
-        const { walletAddress } = req.body;
-        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
-        
-        const post = await Post.findById(req.params.postId);
-        
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-        
-        if (post.walletAddress !== validatedWalletAddress) {
-            return res.status(403).json({ message: 'Not authorized to delete this post' });
-        }
-        
-        await post.deleteOne();
-        res.json({ message: 'Post deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting post:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
+        res.status(500).json({ message: error.message });
     }
 });
 
