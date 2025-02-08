@@ -32,12 +32,6 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use((req, res, next) => {
-    req.setTimeout(30000); // 30 seconds
-    res.setTimeout(30000); // 30 seconds
-    next();
-});
-
 // Parse JSON bodies
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
