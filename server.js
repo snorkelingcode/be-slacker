@@ -8,34 +8,73 @@ const postRoutes = require('./routes/posts');
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB with verbose logging
+console.log('🚀 Starting server...');
+console.log('📝 Attempting MongoDB connection...');
+
+connectDB().then(() => {
+    console.log('✅ MongoDB connection successful');
+}).catch((err) => {
+    console.error('❌ MongoDB connection failed:', err);
+});
 
 // CORS Setup
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', 'https://fe-slacker.vercel.app');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    next();
-});
+app.use(cors({
+    origin: 'https://fe-slacker.vercel.app',
+    credentials: true
+}));
 
 // Parse JSON bodies
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Root route
-app.get('/', (req, res) => {
-    res.json({ message: 'Server is running' });
+// Enhanced health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+        const dbState = mongoose.connection.readyState;
+        const states = {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting',
+            3: 'disconnecting'
+        };
+
+        // Get database stats if connected
+        let dbStats = null;
+        if (dbState === 1) {
+            const collections = await mongoose.connection.db.listCollections().toArray();
+            const userCount = await mongoose.connection.db.collection('users').countDocuments();
+            dbStats = {
+                collections: collections.map(c => c.name),
+                userCount
+            };
+        }
+
+        res.json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            mongodb: {
+                state: states[dbState],
+                stats: dbStats
+            },
+            env: {
+                node_env: process.env.NODE_ENV,
+                mongodb_uri_exists: !!process.env.MONGODB_URI
+            }
+        });
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(500).json({
+            status: 'error',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
-// Request logging
+// Request logging middleware
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log(`📥 ${new Date().toISOString()} ${req.method} ${req.url}`);
     next();
 });
 
@@ -43,25 +82,13 @@ app.use((req, res, next) => {
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 
-// Health check route
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-});
-
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Error:', {
+    console.error('❌ Error:', {
         message: err.message,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         timestamp: new Date().toISOString()
     });
-    
-    if (err.name === 'CorsError') {
-        return res.status(403).json({
-            error: 'CORS Error',
-            message: 'Access blocked by CORS policy'
-        });
-    }
     
     res.status(err.status || 500).json({
         error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
@@ -73,7 +100,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
+        console.log(`🌐 Server running on port ${PORT}`);
     });
 }
 
