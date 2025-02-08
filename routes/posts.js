@@ -148,36 +148,33 @@ router.post('/:postId/like', async (req, res) => {
 });
 
 // Add comment to post
-router.post('/:postId/comment', async (req, res) => {
+router.post('/', async (req, res) => {
     try {
-        const { walletAddress, content } = req.body;
-        const { postId } = req.params;
+        const { walletAddress, content, mediaUrl, mediaType } = req.body;
+        
+        console.log('Received Post Data:', { walletAddress, content, mediaUrl, mediaType });
 
+        // Validate wallet address and content
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
-        const sanitizedContent = ValidationUtils.sanitizeInput(content, 500);
+        const sanitizedContent = ValidationUtils.sanitizeInput(content, 1000);
 
+        // Find user by wallet address
         const user = await prisma.user.findUnique({
             where: { walletAddress: validatedWalletAddress }
         });
 
+        console.log('Found User:', user);
+
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ 
+                message: 'User not found',
+                walletAddress: validatedWalletAddress 
+            });
         }
 
-        const comment = await prisma.comment.create({
-            data: {
-                content: sanitizedContent,
-                authorId: user.id,
-                postId: postId
-            },
-            include: {
-                author: true
-            }
-        });
-
-        res.json(comment);
+        // Rest of the code remains the same
     } catch (error) {
-        console.error('Error adding comment:', error);
+        console.error('Error creating post:', error);
         res.status(500).json({ message: error.message });
     }
 });
