@@ -1,24 +1,39 @@
 const mongoose = require('mongoose');
 
+// Cache the database connection
+let cachedConnection = null;
+
 const connectDB = async () => {
+    if (cachedConnection) {
+        return cachedConnection;
+    }
+
     try {
-        console.log('Attempting to connect to MongoDB...');
-        const conn = await mongoose.connect(process.env.MONGODB_URI);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
+        const opts = {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            bufferCommands: false,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+            family: 4
+        };
+
+        const conn = await mongoose.connect(process.env.MONGODB_URI, opts);
         
-        // Test the connection
-        const collections = await mongoose.connection.db.listCollections().toArray();
-        console.log('Available collections:', collections.map(c => c.name));
+        // Minimal connection logging
+        console.log('MongoDB connected');
         
-        // Try to count users
-        const userCount = await mongoose.connection.db.collection('users').countDocuments();
-        console.log('Number of users in database:', userCount);
-        
+        cachedConnection = conn;
         return conn;
     } catch (error) {
-        console.error('MongoDB connection error:', error);
-        process.exit(1);
+        console.error('MongoDB connection error:', error.message);
+        throw error;
     }
 };
+
+// Handle connection errors
+mongoose.connection.on('error', err => {
+    console.error('MongoDB error:', err.message);
+});
 
 module.exports = connectDB;
