@@ -16,37 +16,7 @@ connectDB().then(() => {
     console.log('✅ MongoDB connection successful');
 }).catch((err) => {
     console.error('❌ MongoDB connection failed:', err);
-});
-
-// Database initialization function
-const initializeDatabase = async () => {
-    try {
-        // Check if collections exist, if not create them
-        const collections = await mongoose.connection.db.listCollections().toArray();
-        const collectionNames = collections.map(col => col.name);
-
-        // Create users collection if it doesn't exist
-        if (!collectionNames.includes('users')) {
-            console.log('Creating users collection...');
-            await mongoose.connection.db.createCollection('users');
-        }
-
-        // Create posts collection if it doesn't exist
-        if (!collectionNames.includes('posts')) {
-            console.log('Creating posts collection...');
-            await mongoose.connection.db.createCollection('posts');
-        }
-
-        console.log('Database initialization complete!');
-    } catch (error) {
-        console.error('Error initializing database:', error);
-    }
-};
-
-// Call initialization after successful connection
-mongoose.connection.once('connected', async () => {
-    console.log('MongoDB Connected');
-    await initializeDatabase();
+    process.exit(1);
 });
 
 // CORS Setup
@@ -129,10 +99,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-        console.log(`🌐 Server running on port ${PORT}`);
-    });
-}
-
 module.exports = app;
