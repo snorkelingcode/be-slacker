@@ -18,4 +18,6 @@ const connectDB = async () => {
     }
 };
 
+//comment
+
 module.exports = connectDB;
