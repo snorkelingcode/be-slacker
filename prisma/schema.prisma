@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma/prisma-client-js"
 }
 
 datasource db {
@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  walletAddress String    @unique
-  username      String
-  bio           String?   @default("New to Slacker")
-  profilePicture String?
-  bannerPicture String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  posts         Post[]
-  comments      Comment[]
-  likes         Like[]
+  id              String    @id @default(cuid())
+  walletAddress   String    @unique
+  username        String
+  bio             String?   @default("New to Burner")
+  profilePicture  String?
+  bannerPicture   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  accountType     String    @default("wallet")
+  expiresAt       DateTime?
+  posts           Post[]
+  comments        Comment[]
+  likes           Like[]
 }
 
 model Post {
