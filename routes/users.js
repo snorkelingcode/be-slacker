@@ -1,150 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
-const { ValidationUtils, ErrorUtils } = require('../utils/backendUtils');
-const crypto = require('crypto');
+const { ValidationUtils } = require('../utils/backendUtils');
 
 const prisma = new PrismaClient();
 
-// Token generation utility
-function generateSecureToken(walletAddress) {
-    const tokenData = {
-        walletAddress: walletAddress.toLowerCase(),
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-    };
-
-    const tokenString = JSON.stringify(tokenData);
-    const hmac = crypto.createHmac('sha256', process.env.TOKEN_SECRET || 'fallback_secret');
-    const signature = hmac.update(tokenString).digest('hex');
-
-    return Buffer.from(JSON.stringify({
-        ...tokenData,
-        signature
-    })).toString('base64');
-}
-
-function verifySecureToken(token) {
-    try {
-        const tokenJson = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
-        const { walletAddress, createdAt, expiresAt, signature } = tokenJson;
-
-        // Check expiration
-        const now = new Date();
-        const expires = new Date(expiresAt);
-        if (now > expires) {
-            console.log('Token expired');
-            return false;
-        }
-
-        // Regenerate signature
-        const originalData = { walletAddress, createdAt, expiresAt };
-        const hmac = crypto.createHmac('sha256', process.env.TOKEN_SECRET || 'fallback_secret');
-        const expectedSignature = hmac.update(JSON.stringify(originalData)).digest('hex');
-
-        // Compare signatures
-        return signature === expectedSignature;
-    } catch (error) {
-        console.error('Token verification error:', error);
-        return false;
-    }
-}
-
-// Session management routes
-router.post('/session', async (req, res) => {
-    try {
-        const { walletAddress } = req.body;
-        
-        // Validate wallet address
-        const validatedAddress = ValidationUtils.validateWalletAddress(walletAddress);
-        
-        // Ensure user exists
-        let user = await prisma.user.findUnique({
-            where: { walletAddress: validatedAddress }
-        });
-
-        // Create user if not exists
-        if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    walletAddress: validatedAddress,
-                    username: `User_${validatedAddress.substring(2, 8)}`,
-                    bio: 'New to Slacker'
-                }
-            });
-        }
-
-        // Generate secure token
-        const token = generateSecureToken(validatedAddress);
-        
-        res.json({ 
-            token,
-            user: {
-                id: user.id,
-                walletAddress: user.walletAddress,
-                username: user.username,
-                bio: user.bio
-            },
-            message: 'Session created successfully' 
-        });
-    } catch (error) {
-        console.error('Session creation error:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
-    }
-});
-
-router.post('/validate-session', async (req, res) => {
-    try {
-        const { token } = req.body;
-        
-        // Validate token 
-        if (!verifySecureToken(token)) {
-            return res.status(401).json({ message: 'Invalid or expired session' });
-        }
-
-        // Optional: Additional user verification
-        const tokenData = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
-        const user = await prisma.user.findUnique({
-            where: { walletAddress: tokenData.walletAddress.toLowerCase() }
-        });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        res.json({ 
-            message: 'Session is valid',
-            user: {
-                id: user.id,
-                walletAddress: user.walletAddress,
-                username: user.username,
-                bio: user.bio
-            }
-        });
-    } catch (error) {
-        console.error('Session validation error:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
-    }
-});
-
-router.post('/logout', async (req, res) => {
-    try {
-        const { walletAddress } = req.body;
-        
-        // Optional: Implement additional logout logic if needed
-        // For example, you might want to invalidate specific tokens or log logout events
-        
-        res.json({ message: 'Logged out successfully' });
-    } catch (error) {
-        console.error('Logout error:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
-    }
-});
-
-// Existing profile routes remain the same
+// Get user profile by wallet address
 router.get('/profile/:walletAddress', async (req, res) => {
     try {
         const walletAddress = ValidationUtils.validateWalletAddress(req.params.walletAddress);
+        
+        console.log('Searching for profile with wallet address:', walletAddress);
         
         const user = await prisma.user.findUnique({
             where: { walletAddress },
@@ -159,19 +25,184 @@ router.get('/profile/:walletAddress', async (req, res) => {
         });
         
         if (!user) {
+            console.log('No user found, returning 404');
             return res.status(404).json({ 
                 message: 'User profile not found',
                 walletAddress: walletAddress
             });
         }
         
+        console.log('User found:', user);
         res.json(user);
     } catch (error) {
         console.error('Error fetching user profile:', error);
-        res.status(500).json(ErrorUtils.formatError(error));
+        res.status(500).json({
+            message: 'Error fetching user profile',
+            error: error.message
+        });
     }
 });
 
-// Existing routes for profile update, posts, etc. remain the same
+// Create or update user profile
+router.post('/profile', async (req, res) => {
+    try {
+        const { walletAddress, username, bio } = req.body;
+        
+        console.log('Received profile data:', { walletAddress, username, bio });
+
+        // Validate inputs
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        const sanitizedUsername = ValidationUtils.validateUsername(username);
+        const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Slacker', 500);
+
+        // Create or update user using Prisma upsert
+        const user = await prisma.user.upsert({
+            where: {
+                walletAddress: validatedWalletAddress
+            },
+            update: {
+                username: sanitizedUsername,
+                bio: sanitizedBio,
+                updatedAt: new Date()
+            },
+            create: {
+                walletAddress: validatedWalletAddress,
+                username: sanitizedUsername,
+                bio: sanitizedBio
+            }
+        });
+        
+        console.log('User created/updated:', user);
+        res.status(201).json(user);
+    } catch (error) {
+        console.error('Error creating/updating user profile:', error);
+        res.status(500).json({
+            message: 'Error processing user profile',
+            error: error.message
+        });
+    }
+});
+
+// Update profile pictures
+router.post('/profile/picture', async (req, res) => {
+    try {
+        const { walletAddress, imageType, imageUrl } = req.body;
+        
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+
+        let updateData = {};
+        if (imageType === 'profile') {
+            updateData.profilePicture = imageUrl;
+        } else if (imageType === 'banner') {
+            updateData.bannerPicture = imageUrl;
+        } else {
+            return res.status(400).json({ message: 'Invalid image type' });
+        }
+
+        const user = await prisma.user.update({
+            where: {
+                walletAddress: validatedWalletAddress
+            },
+            data: {
+                ...updateData,
+                updatedAt: new Date()
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json(user);
+    } catch (error) {
+        console.error('Error updating profile picture:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get user's posts
+router.get('/:walletAddress/posts', async (req, res) => {
+    try {
+        const walletAddress = ValidationUtils.validateWalletAddress(req.params.walletAddress);
+
+        const user = await prisma.user.findUnique({
+            where: { walletAddress }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const posts = await prisma.post.findMany({
+            where: {
+                authorId: user.id
+            },
+            include: {
+                author: true,
+                comments: {
+                    include: {
+                        author: true
+                    }
+                },
+                likes: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        res.json(posts);
+    } catch (error) {
+        console.error('Error fetching user posts:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get all users (with pagination)
+router.get('/', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const skip = (page - 1) * limit;
+
+        const users = await prisma.user.findMany({
+            skip,
+            take: limit,
+            include: {
+                _count: {
+                    select: {
+                        posts: true,
+                        likes: true,
+                        comments: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        const total = await prisma.user.count();
+
+        res.json({
+            users,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
 
 module.exports = router;
