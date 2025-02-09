@@ -3,13 +3,11 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "walletAddress" TEXT NOT NULL,
     "username" TEXT NOT NULL,
-    "bio" TEXT DEFAULT 'New to Burner',
+    "bio" TEXT DEFAULT 'New to Slacker',
     "profilePicture" TEXT,
     "bannerPicture" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "accountType" TEXT NOT NULL DEFAULT 'wallet',
-    "expiresAt" TIMESTAMP(3),
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
