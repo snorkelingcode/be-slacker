@@ -54,7 +54,20 @@ class ErrorUtils {
     }
 }
 
+class BurnerAccountUtils {
+    static generateBurnerAddress() {
+        // Generate a cryptographically secure random Ethereum-like address
+        const randomBytes = crypto.randomBytes(20);
+        return '0x' + randomBytes.toString('hex');
+    }
+
+    static isBurnerAddress(address) {
+        // Optional: Add specific validation for burner addresses if needed
+        return address.toLowerCase().startsWith('0xburner');
+    }
+}
+
 module.exports = {
-    ValidationUtils,
-    ErrorUtils
-};
+    ...existingExports,
+    BurnerAccountUtils
+}

@@ -46,14 +46,17 @@ router.get('/profile/:walletAddress', async (req, res) => {
 // Create or update user profile
 router.post('/profile', async (req, res) => {
     try {
-        const { walletAddress, username, bio } = req.body;
+        const { 
+            walletAddress, 
+            username, 
+            bio, 
+            accountType = 'wallet' // Default to wallet, allow burner
+        } = req.body;
         
-        console.log('Received profile data:', { walletAddress, username, bio });
-
         // Validate inputs
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         const sanitizedUsername = ValidationUtils.validateUsername(username);
-        const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Slacker', 500);
+        const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Burner', 500);
 
         // Create or update user using Prisma upsert
         const user = await prisma.user.upsert({
@@ -63,16 +66,17 @@ router.post('/profile', async (req, res) => {
             update: {
                 username: sanitizedUsername,
                 bio: sanitizedBio,
+                accountType, // Add account type
                 updatedAt: new Date()
             },
             create: {
                 walletAddress: validatedWalletAddress,
                 username: sanitizedUsername,
-                bio: sanitizedBio
+                bio: sanitizedBio,
+                accountType // Add account type
             }
         });
         
-        console.log('User created/updated:', user);
         res.status(201).json(user);
     } catch (error) {
         console.error('Error creating/updating user profile:', error);
@@ -80,6 +84,31 @@ router.post('/profile', async (req, res) => {
             message: 'Error processing user profile',
             error: error.message
         });
+    }
+});
+
+// Add a route to clean up burner accounts
+router.delete('/burner-cleanup', async (req, res) => {
+    try {
+        // Delete burner accounts older than 24 hours
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        const deletedUsers = await prisma.user.deleteMany({
+            where: {
+                accountType: 'burner',
+                createdAt: {
+                    lt: twentyFourHoursAgo
+                }
+            }
+        });
+
+        res.json({
+            message: 'Burner accounts cleaned up',
+            deletedCount: deletedUsers.count
+        });
+    } catch (error) {
+        console.error('Error cleaning up burner accounts:', error);
+        res.status(500).json({ message: error.message });
     }
 });
 
