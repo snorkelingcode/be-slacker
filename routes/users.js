@@ -48,14 +48,13 @@ router.post('/profile', async (req, res) => {
         const { 
             walletAddress, 
             username, 
-            bio, 
-            accountType = 'wallet' // Default to wallet, allow burner
+            bio
         } = req.body;
         
         // Validate inputs
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         const sanitizedUsername = ValidationUtils.validateUsername(username);
-        const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Burner', 500);
+        const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Slacker', 500);
 
         // Create or update user using Prisma upsert
         const user = await prisma.user.upsert({
@@ -65,14 +64,12 @@ router.post('/profile', async (req, res) => {
             update: {
                 username: sanitizedUsername,
                 bio: sanitizedBio,
-                accountType, // Add account type
                 updatedAt: new Date()
             },
             create: {
                 walletAddress: validatedWalletAddress,
                 username: sanitizedUsername,
-                bio: sanitizedBio,
-                accountType // Add account type
+                bio: sanitizedBio
             }
         });
         
