@@ -67,7 +67,9 @@ class BurnerAccountUtils {
     }
 }
 
+// Export all utility classes
 module.exports = {
-    ...existingExports,
+    ValidationUtils,
+    ErrorUtils,
     BurnerAccountUtils
-}
+};
