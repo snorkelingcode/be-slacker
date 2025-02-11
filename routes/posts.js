@@ -297,4 +297,41 @@ router.post('/:postId/comment', async (req, res) => {
     }
 });
 
+// Delete a comment
+router.delete('/:postId/comments/:commentId', async (req, res) => {
+    try {
+        const { postId, commentId } = req.params;
+        const { walletAddress } = req.body;
+        
+        // Validate wallet address
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+
+        // Find the comment and verify ownership
+        const comment = await prisma.comment.findUnique({
+            where: { id: commentId },
+            include: { author: true }
+        });
+
+        if (!comment) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        // Ensure only the comment author can delete
+        if (comment.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
+            return res.status(403).json({ message: 'Not authorized to delete this comment' });
+        }
+
+        // Delete the comment
+        await prisma.comment.delete({
+            where: { id: commentId }
+        });
+
+        // Return a success message
+        res.json({ message: 'Comment deleted successfully', commentId });
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;
