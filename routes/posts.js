@@ -40,6 +40,12 @@ router.post('/', async (req, res) => {
             },
             include: {
                 author: true,
+                comments: {
+                    include: {
+                        author: true
+                    }
+                },
+                likes: true,
                 _count: {
                     select: {
                         likes: true,
@@ -65,6 +71,9 @@ router.get('/', async (req, res) => {
                 comments: {
                     include: {
                         author: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
                     }
                 },
                 likes: true,
@@ -88,37 +97,12 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Delete a post
-router.delete('/:postId/comments/:commentId', async (req, res) => {
+// Get a specific post by ID
+router.get('/:postId', async (req, res) => {
     try {
-        const { postId, commentId } = req.params;
-        const { walletAddress } = req.body;
-        
-        // Validate wallet address
-        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        const { postId } = req.params;
 
-        // Find the comment and verify ownership
-        const comment = await prisma.comment.findUnique({
-            where: { id: commentId },
-            include: { author: true }
-        });
-
-        if (!comment) {
-            return res.status(404).json({ message: 'Comment not found' });
-        }
-
-        // Ensure only the comment author can delete
-        if (comment.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
-            return res.status(403).json({ message: 'Not authorized to delete this comment' });
-        }
-
-        // Delete the comment
-        await prisma.comment.delete({
-            where: { id: commentId }
-        });
-
-        // Fetch updated post to return
-        const updatedPost = await prisma.post.findUnique({
+        const post = await prisma.post.findUnique({
             where: { id: postId },
             include: {
                 author: true,
@@ -140,9 +124,61 @@ router.delete('/:postId/comments/:commentId', async (req, res) => {
             }
         });
 
-        res.json(updatedPost);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        res.json(post);
     } catch (error) {
-        console.error('Error deleting comment:', error);
+        console.error('Error fetching post:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Delete a post
+router.delete('/:postId', async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { walletAddress } = req.body;
+        
+        // Validate wallet address
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+
+        // Find the post and verify ownership
+        const post = await prisma.post.findUnique({
+            where: { id: postId },
+            include: { author: true }
+        });
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Ensure only the post author can delete
+        if (post.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
+            return res.status(403).json({ message: 'Not authorized to delete this post' });
+        }
+
+        // Delete related likes and comments first
+        await prisma.like.deleteMany({
+            where: { postId }
+        });
+
+        await prisma.comment.deleteMany({
+            where: { postId }
+        });
+
+        // Delete the post
+        await prisma.post.delete({
+            where: { id: postId }
+        });
+
+        res.json({ 
+            message: 'Post deleted successfully',
+            postId 
+        });
+    } catch (error) {
+        console.error('Error deleting post:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -198,12 +234,15 @@ router.post('/:postId/like', async (req, res) => {
             where: { id: postId },
             include: {
                 author: true,
-                likes: true,
                 comments: {
                     include: {
                         author: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
                     }
                 },
+                likes: true,
                 _count: {
                     select: {
                         likes: true,
@@ -227,7 +266,7 @@ router.post('/:postId/like', async (req, res) => {
 // Add comment to post
 router.post('/:postId/comment', async (req, res) => {
     try {
-        const { walletAddress, content } = req.body;
+        const { walletAddress, content, mediaUrl, mediaType } = req.body;
         const { postId } = req.params;
 
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
@@ -245,25 +284,13 @@ router.post('/:postId/comment', async (req, res) => {
         const comment = await prisma.comment.create({
             data: {
                 content: sanitizedContent,
+                mediaUrl,
+                mediaType,
                 authorId: user.id,
                 postId: postId
             },
             include: {
-                author: true,
-                post: {
-                    include: {
-                        comments: {
-                            include: {
-                                author: true
-                            }
-                        },
-                        _count: {
-                            select: {
-                                comments: true
-                            }
-                        }
-                    }
-                }
+                author: true
             }
         });
 
