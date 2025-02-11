@@ -89,49 +89,60 @@ router.get('/', async (req, res) => {
 });
 
 // Delete a post
-router.delete('/:postId', async (req, res) => {
+router.delete('/:postId/comments/:commentId', async (req, res) => {
     try {
-        const { postId } = req.params;
+        const { postId, commentId } = req.params;
         const { walletAddress } = req.body;
         
         // Validate wallet address
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
 
-        // Find the post and verify ownership
-        const post = await prisma.post.findUnique({
-            where: { id: postId },
+        // Find the comment and verify ownership
+        const comment = await prisma.comment.findUnique({
+            where: { id: commentId },
             include: { author: true }
         });
 
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
+        if (!comment) {
+            return res.status(404).json({ message: 'Comment not found' });
         }
 
-        // Ensure only the post author can delete
-        if (post.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
-            return res.status(403).json({ message: 'Not authorized to delete this post' });
+        // Ensure only the comment author can delete
+        if (comment.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
+            return res.status(403).json({ message: 'Not authorized to delete this comment' });
         }
 
-        // Delete related likes and comments first
-        await prisma.like.deleteMany({
-            where: { postId }
+        // Delete the comment
+        await prisma.comment.delete({
+            where: { id: commentId }
         });
 
-        await prisma.comment.deleteMany({
-            where: { postId }
+        // Fetch updated post to return
+        const updatedPost = await prisma.post.findUnique({
+            where: { id: postId },
+            include: {
+                author: true,
+                comments: {
+                    include: {
+                        author: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                },
+                likes: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            }
         });
 
-        // Delete the post
-        await prisma.post.delete({
-            where: { id: postId }
-        });
-
-        res.json({ 
-            message: 'Post deleted successfully',
-            postId 
-        });
+        res.json(updatedPost);
     } catch (error) {
-        console.error('Error deleting post:', error);
+        console.error('Error deleting comment:', error);
         res.status(500).json({ message: error.message });
     }
 });
