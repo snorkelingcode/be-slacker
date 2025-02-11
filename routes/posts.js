@@ -161,10 +161,17 @@ router.post('/:postId/like', async (req, res) => {
             });
         }
 
+        // Get updated post with complete information
         const updatedPost = await prisma.post.findUnique({
             where: { id: postId },
             include: {
+                author: true,
                 likes: true,
+                comments: {
+                    include: {
+                        author: true
+                    }
+                },
                 _count: {
                     select: {
                         likes: true,
@@ -173,6 +180,10 @@ router.post('/:postId/like', async (req, res) => {
                 }
             }
         });
+
+        if (!updatedPost) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
 
         res.json(updatedPost);
     } catch (error) {
