@@ -209,6 +209,7 @@ router.post('/:postId/comment', async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        // Create comment
         const comment = await prisma.comment.create({
             data: {
                 content: sanitizedContent,
@@ -216,11 +217,48 @@ router.post('/:postId/comment', async (req, res) => {
                 postId: postId
             },
             include: {
-                author: true
+                author: true,
+                post: {
+                    include: {
+                        comments: {
+                            include: {
+                                author: true
+                            }
+                        },
+                        _count: {
+                            select: {
+                                comments: true
+                            }
+                        }
+                    }
+                }
             }
         });
 
-        res.status(201).json(comment);
+        // Get updated post with all comments
+        const updatedPost = await prisma.post.findUnique({
+            where: { id: postId },
+            include: {
+                author: true,
+                comments: {
+                    include: {
+                        author: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                },
+                likes: true,
+                _count: {
+                    select: {
+                        likes: true,
+                        comments: true
+                    }
+                }
+            }
+        });
+
+        res.status(201).json(updatedPost);
     } catch (error) {
         console.error('Error adding comment:', error);
         res.status(500).json({ message: error.message });
