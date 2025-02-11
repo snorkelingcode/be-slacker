@@ -92,8 +92,12 @@ router.get('/', async (req, res) => {
 router.delete('/:postId', async (req, res) => {
     try {
         const { postId } = req.params;
+        const { walletAddress } = req.body;
         
-        // First, verify the post exists
+        // Validate wallet address
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+
+        // Find the post and verify ownership
         const post = await prisma.post.findUnique({
             where: { id: postId },
             include: { author: true }
@@ -103,12 +107,29 @@ router.delete('/:postId', async (req, res) => {
             return res.status(404).json({ message: 'Post not found' });
         }
 
+        // Ensure only the post author can delete
+        if (post.author.walletAddress.toLowerCase() !== validatedWalletAddress.toLowerCase()) {
+            return res.status(403).json({ message: 'Not authorized to delete this post' });
+        }
+
+        // Delete related likes and comments first
+        await prisma.like.deleteMany({
+            where: { postId }
+        });
+
+        await prisma.comment.deleteMany({
+            where: { postId }
+        });
+
         // Delete the post
         await prisma.post.delete({
             where: { id: postId }
         });
 
-        res.json({ message: 'Post deleted successfully' });
+        res.json({ 
+            message: 'Post deleted successfully',
+            postId 
+        });
     } catch (error) {
         console.error('Error deleting post:', error);
         res.status(500).json({ message: error.message });
