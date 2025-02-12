@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  walletAddress String    @unique
-  username      String
-  bio           String?   @default("New to Slacker")
+  id             String    @id @default(cuid())
+  walletAddress  String    @unique
+  username       String
+  bio           String?    @default("New to Slacker")
   profilePicture String?
-  bannerPicture String?
-  accountType   String    @default("METAMASK")  // New field
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  posts         Post[]
-  comments      Comment[]
-  likes         Like[]
+  bannerPicture  String?
+  accountType    String    @default("METAMASK")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  posts          Post[]
+  comments       Comment[]
+  likes          Like[]
 }
 
 model Post {
@@ -29,8 +29,8 @@ model Post {
   mediaType String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  author    User      @relation(fields: [authorId], references: [id])
   authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
   comments  Comment[]
   likes     Like[]
 }
@@ -38,20 +38,22 @@ model Post {
 model Comment {
   id        String   @id @default(cuid())
   content   String
+  mediaUrl  String?
+  mediaType String?
   createdAt DateTime @default(now())
-  author    User     @relation(fields: [authorId], references: [id])
   authorId  String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model Like {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
 }

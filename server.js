@@ -12,12 +12,19 @@ const corsOptions = {
         'http://localhost:3000'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization',
+        'Content-Length',
+        'X-Requested-With'
+    ],
+    credentials: true,
+    maxAge: 600 // Cache preflight requests for 10 minutes
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/api/upload', require('./routes/upload'));
 
 // Add a root route to handle the basic GET request
 app.get('/', (req, res) => {
