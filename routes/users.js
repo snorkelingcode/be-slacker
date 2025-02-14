@@ -48,28 +48,41 @@ router.post('/profile', async (req, res) => {
         const { 
             walletAddress, 
             username, 
-            bio
+            bio,
+            theme,
+            profilePicture,
+            bannerPicture
         } = req.body;
         
         // Validate inputs
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
         const sanitizedUsername = ValidationUtils.validateUsername(username);
         const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Slacker', 500);
+        const validTheme = theme === 'dark' || theme === 'light' ? theme : undefined;
+
+        // Create update data object
+        const updateData = {
+            username: sanitizedUsername,
+            bio: sanitizedBio,
+            updatedAt: new Date()
+        };
+
+        // Only add optional fields if they're provided
+        if (validTheme) updateData.theme = validTheme;
+        if (profilePicture) updateData.profilePicture = profilePicture;
+        if (bannerPicture) updateData.bannerPicture = bannerPicture;
 
         // Create or update user using Prisma upsert
         const user = await prisma.user.upsert({
             where: {
                 walletAddress: validatedWalletAddress
             },
-            update: {
-                username: sanitizedUsername,
-                bio: sanitizedBio,
-                updatedAt: new Date()
-            },
+            update: updateData,
             create: {
                 walletAddress: validatedWalletAddress,
                 username: sanitizedUsername,
-                bio: sanitizedBio
+                bio: sanitizedBio,
+                theme: validTheme || 'light'
             }
         });
         
@@ -83,10 +96,37 @@ router.post('/profile', async (req, res) => {
     }
 });
 
-// Add a route to clean up burner accounts
+// Update theme
+router.post('/profile/theme', async (req, res) => {
+    try {
+        const { walletAddress, theme } = req.body;
+        
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        
+        if (!['light', 'dark'].includes(theme)) {
+            return res.status(400).json({ message: 'Invalid theme value' });
+        }
+
+        const user = await prisma.user.update({
+            where: {
+                walletAddress: validatedWalletAddress
+            },
+            data: {
+                theme,
+                updatedAt: new Date()
+            }
+        });
+
+        res.json(user);
+    } catch (error) {
+        console.error('Error updating theme:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Clean up burner accounts
 router.delete('/burner-cleanup', async (req, res) => {
     try {
-        // Delete burner accounts older than 24 hours
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         
         const deletedUsers = await prisma.user.deleteMany({
@@ -133,10 +173,6 @@ router.post('/profile/picture', async (req, res) => {
                 updatedAt: new Date()
             }
         });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
 
         res.json(user);
     } catch (error) {
