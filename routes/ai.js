@@ -5,10 +5,8 @@ const { ValidationUtils } = require('../utils/backendUtils');
 
 router.post('/chat', async (req, res) => {
     try {
-        const { walletAddress, message } = req.body;
-
-        // Validate wallet address
-        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        console.log('OpenAI API Key:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing');
+        console.log('Request Body:', req.body);
 
         const openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY
@@ -18,7 +16,7 @@ router.post('/chat', async (req, res) => {
             model: "gpt-3.5-turbo",
             messages: [
                 { role: "system", content: "You are a helpful AI assistant in a social media app called Slacker. Keep responses concise and friendly." },
-                { role: "user", content: message }
+                { role: "user", content: req.body.message }
             ],
             max_tokens: 150
         });
@@ -30,7 +28,13 @@ router.post('/chat', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('AI Chat Error:', error);
+        console.error('Detailed AI Chat Error:', {
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+            code: error.code,
+            details: error.response ? error.response.data : 'No additional details'
+        });
         res.status(500).json({ 
             message: 'Error processing AI request',
             error: error.message 
