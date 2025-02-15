@@ -8,53 +8,53 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  walletAddress  String    @unique
-  username       String
-  bio            String?   @default("New to Slacker")
-  profilePicture String?
-  bannerPicture  String?
-  accountType    String    @default("METAMASK")
-  theme          String    @default("light")  // Add theme field
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  posts          Post[]
-  comments       Comment[]
-  likes          Like[]
+  id              String    @id @default(cuid())
+  walletAddress   String    @unique
+  username        String
+  bio             String?   @default("New to Slacker")
+  profilePicture  String?
+  bannerPicture   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  theme           String    @default("light")  // Added this line
+  accountType     String    @default("METAMASK")
+  posts           Post[]
+  comments        Comment[]
+  likes           Like[]
 }
 
 model Post {
-  id        String    @id @default(cuid())
-  content   String
-  mediaUrl  String?
-  mediaType String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  authorId  String
-  author    User      @relation(fields: [authorId], references: [id])
-  comments  Comment[]
-  likes     Like[]
+  id          String    @id @default(cuid())
+  content     String
+  mediaUrl    String?
+  mediaType   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String
+  comments    Comment[]
+  likes       Like[]
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  mediaUrl  String?
-  mediaType String?
-  createdAt DateTime @default(now())
-  authorId  String
-  postId    String
-  author    User     @relation(fields: [authorId], references: [id])
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  content     String
+  mediaUrl    String?
+  mediaType   String?
+  createdAt   DateTime  @default(now())
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId      String
 }
 
 model Like {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
   userId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
-  user      User     @relation(fields: [userId], references: [id])
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
 }
