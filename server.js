@@ -15,7 +15,6 @@ const prisma = new PrismaClient({
 const corsOptions = {
     origin: [
         'https://fe-slacker.vercel.app',
-        'https://your-frontend-domain.vercel.app', // Add your actual frontend domain
         'http://localhost:3000',
         'http://localhost:5173'
     ],
@@ -243,7 +242,5 @@ process.on('uncaughtException', (error) => {
 
 // Start the server
 startServer();
-
-// Something to push
 
 module.exports = app;
