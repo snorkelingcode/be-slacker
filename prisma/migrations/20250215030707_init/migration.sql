@@ -8,6 +8,8 @@ CREATE TABLE "User" (
     "bannerPicture" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "theme" TEXT NOT NULL DEFAULT 'light',
+    "accountType" TEXT NOT NULL DEFAULT 'METAMASK',
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -29,6 +31,8 @@ CREATE TABLE "Post" (
 CREATE TABLE "Comment" (
     "id" TEXT NOT NULL,
     "content" TEXT NOT NULL,
+    "mediaUrl" TEXT,
+    "mediaType" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "authorId" TEXT NOT NULL,
     "postId" TEXT NOT NULL,
