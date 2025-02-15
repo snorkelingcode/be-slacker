@@ -11,10 +11,11 @@ model User {
   id             String    @id @default(cuid())
   walletAddress  String    @unique
   username       String
-  bio           String?    @default("New to Slacker")
+  bio            String?   @default("New to Slacker")
   profilePicture String?
   bannerPicture  String?
   accountType    String    @default("METAMASK")
+  theme          String    @default("light")  // Add theme field
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   posts          Post[]

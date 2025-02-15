@@ -41,5 +41,4 @@ router.post('/chat', async (req, res) => {
         });
     }
 });
-//somethingtopush
 module.exports = router;
