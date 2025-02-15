@@ -124,10 +124,6 @@ router.post('/profile/theme', async (req, res) => {
     }
 });
 
-<<<<<<< HEAD
-//something to push
-=======
->>>>>>> parent of 856d8b3 (openai integration test)
 // Clean up burner accounts
 router.delete('/burner-cleanup', async (req, res) => {
     try {
