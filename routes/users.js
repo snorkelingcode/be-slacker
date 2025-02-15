@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { ValidationUtils } = require('../utils/backendUtils');
 const prisma = new PrismaClient();
+const OpenAI = require('openai');
 
 // Get user profile by wallet address
 router.get('/profile/:walletAddress', async (req, res) => {
@@ -121,6 +122,41 @@ router.post('/profile/theme', async (req, res) => {
     } catch (error) {
         console.error('Error updating theme:', error);
         res.status(500).json({ message: error.message });
+    }
+});
+
+router.post('/chat', async (req, res) => {
+    try {
+        const { walletAddress, message } = req.body;
+
+        // Validate wallet address
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                { role: "system", content: "You are a helpful AI assistant in a social media app called Slacker. Keep responses concise and friendly." },
+                { role: "user", content: message }
+            ],
+            max_tokens: 150
+        });
+
+        const aiResponse = completion.choices[0].message.content;
+
+        res.json({ 
+            message: aiResponse,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('AI Chat Error:', error);
+        res.status(500).json({ 
+            message: 'Error processing AI request',
+            error: error.message 
+        });
     }
 });
 

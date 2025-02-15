@@ -94,6 +94,7 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
 // Import and use routes
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
+app.use('/api/ai', require('./routes/ai'));
 
 // Global error handler
 app.use((err, req, res, next) => {
