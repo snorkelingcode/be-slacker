@@ -56,19 +56,19 @@ router.post('/profile', async (req, res) => {
         
         // Validate inputs
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
-        const sanitizedUsername = ValidationUtils.validateUsername(username);
+        const sanitizedUsername = username ? ValidationUtils.validateUsername(username) : `User_${walletAddress.substring(2, 6)}`;
         const sanitizedBio = ValidationUtils.sanitizeInput(bio || 'New to Slacker', 500);
-        const validTheme = theme === 'dark' || theme === 'light' ? theme : undefined;
+        const validTheme = theme === 'dark' || theme === 'light' ? theme : 'light';
 
         // Create update data object
         const updateData = {
             username: sanitizedUsername,
             bio: sanitizedBio,
+            theme: validTheme,
             updatedAt: new Date()
         };
 
         // Only add optional fields if they're provided
-        if (validTheme) updateData.theme = validTheme;
         if (profilePicture) updateData.profilePicture = profilePicture;
         if (bannerPicture) updateData.bannerPicture = bannerPicture;
 
@@ -80,9 +80,7 @@ router.post('/profile', async (req, res) => {
             update: updateData,
             create: {
                 walletAddress: validatedWalletAddress,
-                username: sanitizedUsername,
-                bio: sanitizedBio,
-                theme: validTheme || 'light'
+                ...updateData
             }
         });
         
