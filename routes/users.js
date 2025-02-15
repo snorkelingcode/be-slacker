@@ -3,7 +3,6 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { ValidationUtils } = require('../utils/backendUtils');
 const prisma = new PrismaClient();
-const OpenAI = require('openai');
 
 // Get user profile by wallet address
 router.get('/profile/:walletAddress', async (req, res) => {
@@ -125,7 +124,10 @@ router.post('/profile/theme', async (req, res) => {
     }
 });
 
+<<<<<<< HEAD
 //something to push
+=======
+>>>>>>> parent of 856d8b3 (openai integration test)
 // Clean up burner accounts
 router.delete('/burner-cleanup', async (req, res) => {
     try {
