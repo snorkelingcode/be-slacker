@@ -3,17 +3,20 @@ const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
-const prisma = new PrismaClient();
 const { cloudinary, upload } = require('./config/cloudinary');
 
 const app = express();
+const prisma = new PrismaClient({
+    log: ['query', 'error', 'warn'],
+    errorFormat: 'pretty',
+});
 
 // CORS Configuration
 const corsOptions = {
     origin: [
         'https://fe-slacker.vercel.app',
         'http://localhost:3000',
-        'http://localhost:5173',  // Add any other local development ports
+        'http://localhost:5173'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: [
@@ -32,19 +35,89 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Request Logging Middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log('Request Headers:', req.headers);
+    if (req.method !== 'GET') {
+        console.log('Request Body:', req.body);
+    }
+    next();
+});
+
+// Database connection test
+async function testDbConnection() {
+    try {
+        await prisma.$connect();
+        const result = await prisma.$queryRaw`SELECT 1`;
+        console.log('Database connection test successful:', result);
+        return true;
+    } catch (error) {
+        console.error('Database connection test failed:', error);
+        return false;
+    }
+}
+
+// Health Check Endpoint
+app.get('/api/health', async (req, res) => {
+    try {
+        const dbConnected = await testDbConnection();
+        
+        // Test Cloudinary connection
+        const cloudinaryTest = await cloudinary.api.ping();
+        
+        res.json({
+            status: 'healthy',
+            database: dbConnected ? 'connected' : 'error',
+            cloudinary: cloudinaryTest ? 'connected' : 'error',
+            environment: process.env.NODE_ENV,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Health check failed:', error);
+        res.status(500).json({
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Database Test Endpoint
+app.get('/api/test-db', async (req, res) => {
+    try {
+        const timestamp = await prisma.$queryRaw`SELECT CURRENT_TIMESTAMP`;
+        const userCount = await prisma.user.count();
+        
+        res.json({
+            status: 'success',
+            timestamp: timestamp[0].current_timestamp,
+            userCount,
+            dbUrl: process.env.DATABASE_URL?.split('?')[0] // Hide credentials
+        });
+    } catch (error) {
+        console.error('Database test failed:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+            code: error.code,
+            meta: error.meta
+        });
+    }
+});
+
 // Root route
 app.get('/', (req, res) => {
-    res.status(200).json({ 
+    res.status(200).json({
         message: 'Slacker Backend is running',
         status: 'OK',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
     });
 });
 
 // Handle favicon requests
-app.get('/favicon.ico', (req, res) => {
-    res.status(204).end();
-});
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // File upload endpoints
 app.post('/api/upload', upload.single('file'), async (req, res) => {
@@ -53,7 +126,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        res.json({ 
+        res.json({
             url: req.file.path,
             type: req.file.mimetype.startsWith('video/') ? 'video' : 'image'
         });
@@ -84,7 +157,7 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
             data: updateData
         });
 
-        res.json({ 
+        res.json({
             url: req.file.path,
             user
         });
@@ -92,21 +165,6 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
         console.error('Upload error:', error);
         res.status(500).json({ message: error.message });
     }
-});
-
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    console.log('Request Body:', req.body);
-    console.log('Request Headers:', req.headers);
-    
-    // Capture response
-    const oldSend = res.send;
-    res.send = function(data) {
-        console.log('Response:', data);
-        return oldSend.apply(res, arguments);
-    };
-    
-    next();
 });
 
 // Import and use routes
@@ -124,14 +182,14 @@ app.use((err, req, res, next) => {
         timestamp: new Date().toISOString()
     });
 
-    res.status(500).json({ 
+    res.status(500).json({
         error: err.message || 'Internal server error',
         path: req.path,
         timestamp: new Date().toISOString()
     });
 });
 
-// 404 handler - Keep this last
+// 404 handler
 app.use((req, res) => {
     res.status(404).json({
         message: 'Route not found',
@@ -143,10 +201,33 @@ app.use((req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(`Timestamp: ${new Date().toISOString()}`);
+
+async function startServer() {
+    try {
+        // Test database connection before starting
+        const isConnected = await testDbConnection();
+        if (!isConnected) {
+            console.error('Could not establish database connection. Exiting...');
+            process.exit(1);
+        }
+
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV}`);
+            console.log(`Database URL: ${process.env.DATABASE_URL?.split('?')[0]}`);
+            console.log(`Timestamp: ${new Date().toISOString()}`);
+        });
+    } catch (error) {
+        console.error('Server startup error:', error);
+        process.exit(1);
+    }
+}
+
+// Handle cleanup on shutdown
+process.on('SIGTERM', async () => {
+    console.log('SIGTERM received. Closing HTTP server and database connection...');
+    await prisma.$disconnect();
+    process.exit(0);
 });
 
 // Handle unhandled promise rejections
@@ -157,33 +238,10 @@ process.on('unhandledRejection', (reason, promise) => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
-    // Gracefully shutdown
     process.exit(1);
 });
 
-// Add to server.js
-app.get('/api/health', async (req, res) => {
-    try {
-        // Test database connection
-        await prisma.$queryRaw`SELECT 1`;
-        
-        // Test Cloudinary connection
-        const cloudinaryTest = await cloudinary.api.ping();
-        
-        res.json({
-            status: 'healthy',
-            database: 'connected',
-            cloudinary: cloudinaryTest.status === 200 ? 'connected' : 'error',
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('Health check failed:', error);
-        res.status(500).json({
-            status: 'unhealthy',
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
+// Start the server
+startServer();
 
 module.exports = app;
