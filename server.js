@@ -11,18 +11,21 @@ const app = express();
 // CORS Configuration
 const corsOptions = {
     origin: [
-        'https://fe-slacker.vercel.app', 
-        'http://localhost:3000'
+        'https://fe-slacker.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173',  // Add any other local development ports
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: [
-        'Content-Type', 
-        'Authorization', 
-        'Content-Length',
-        'X-Requested-With'
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin'
     ],
     credentials: true,
-    maxAge: 600
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 };
 
 // Middleware
@@ -91,6 +94,21 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
     }
 });
 
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
+    
+    // Capture response
+    const oldSend = res.send;
+    res.send = function(data) {
+        console.log('Response:', data);
+        return oldSend.apply(res, arguments);
+    };
+    
+    next();
+});
+
 // Import and use routes
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
@@ -141,6 +159,31 @@ process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
     // Gracefully shutdown
     process.exit(1);
+});
+
+// Add to server.js
+app.get('/api/health', async (req, res) => {
+    try {
+        // Test database connection
+        await prisma.$queryRaw`SELECT 1`;
+        
+        // Test Cloudinary connection
+        const cloudinaryTest = await cloudinary.api.ping();
+        
+        res.json({
+            status: 'healthy',
+            database: 'connected',
+            cloudinary: cloudinaryTest.status === 200 ? 'connected' : 'error',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Health check failed:', error);
+        res.status(500).json({
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 module.exports = app;
