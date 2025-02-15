@@ -13,14 +13,18 @@ class ValidationUtils {
         if (!address) {
             throw new Error('Wallet address is required');
         }
-
+    
+        let formattedAddress = address.toLowerCase();
+        if (!formattedAddress.startsWith('0x')) {
+            formattedAddress = '0x' + formattedAddress;
+        }
+    
         const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
-        const lowercaseAddress = address.toLowerCase();
-
-        if (!ethAddressRegex.test(lowercaseAddress)) {
+        if (!ethAddressRegex.test(formattedAddress)) {
             throw new Error('Invalid Ethereum wallet address');
         }
-        return lowercaseAddress;
+        
+        return formattedAddress;
     }
 
     static validateUsername(username) {
