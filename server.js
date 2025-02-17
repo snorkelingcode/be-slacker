@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
-const { cloudinary, upload } = require('./config/cloudinary');
+const { cloudinary, uploadMiddleware } = require('./config/cloudinary');
 
 const app = express();
 const prisma = new PrismaClient({
@@ -119,8 +119,8 @@ app.get('/', (req, res) => {
 // Handle favicon requests
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
-// File upload endpoints
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// Remove the separate upload.single() calls and use uploadMiddleware
+app.post('/api/upload', uploadMiddleware, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
@@ -136,7 +136,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
 });
 
-app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
+app.post('/api/upload/:type', uploadMiddleware, async (req, res) => {
     try {
         const { type } = req.params;
         const { walletAddress } = req.body;

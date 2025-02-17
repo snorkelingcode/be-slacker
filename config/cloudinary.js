@@ -1,4 +1,3 @@
-// config/cloudinary.js
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
@@ -30,19 +29,8 @@ const uploadMiddleware = multer({
     }
 }).single('file');
 
-// Export middleware wrapped in error handling
+// Export the configuration
 module.exports = {
     cloudinary,
-    uploadMiddleware: (req, res, next) => {
-        uploadMiddleware(req, res, (err) => {
-            if (err) {
-                console.error('Multer/Cloudinary error:', err);
-                return res.status(400).json({
-                    message: err.message || 'Error uploading file',
-                    error: err
-                });
-            }
-            next();
-        });
-    }
+    uploadMiddleware  // Export uploadMiddleware directly
 };
