@@ -209,6 +209,15 @@ router.post('/:postId/like', async (req, res) => {
             }
         });
 
+        // Get the post to check author
+        const post = await prisma.post.findUnique({
+            where: { id: postId }
+        });
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
         if (existingLike) {
             // Unlike
             await prisma.like.delete({
@@ -227,6 +236,19 @@ router.post('/:postId/like', async (req, res) => {
                     postId: postId
                 }
             });
+
+            // Create notification for post author
+            if (post.authorId !== user.id) {
+                await prisma.notification.create({
+                    data: {
+                        type: 'like',
+                        message: `${user.username} liked your post`,
+                        recipientId: post.authorId,
+                        senderId: user.id,
+                        postId: postId
+                    }
+                });
+            }
         }
 
         // Get updated post with complete information
@@ -280,6 +302,15 @@ router.post('/:postId/comment', async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        // Get the post to check author
+        const post = await prisma.post.findUnique({
+            where: { id: postId }
+        });
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
         // Create comment
         const comment = await prisma.comment.create({
             data: {
@@ -293,6 +324,19 @@ router.post('/:postId/comment', async (req, res) => {
                 author: true
             }
         });
+
+        // Create notification for post author
+        if (post.authorId !== user.id) {
+            await prisma.notification.create({
+                data: {
+                    type: 'comment',
+                    message: `${user.username} commented on your post`,
+                    recipientId: post.authorId,
+                    senderId: user.id,
+                    postId: postId
+                }
+            });
+        }
 
         // Get updated post with all comments
         const updatedPost = await prisma.post.findUnique({
