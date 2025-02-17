@@ -171,7 +171,8 @@ app.post('/api/upload/:type', uploadMiddleware, async (req, res) => {
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/ai/chat', require('./routes/chat'));  // Add this line
+app.use('/api/ai/chat', require('./routes/chat'));
+app.use('/api/crypto', require('./routes/crypto'));
 
 // Global error handler
 app.use((err, req, res, next) => {

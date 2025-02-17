@@ -25,6 +25,8 @@ model User {
   likes                Like[]
   receivedNotifications Notification[] @relation("ReceivedNotifications")
   sentNotifications    Notification[]  @relation("SentNotifications")
+
+  watchlist String[] @default([])
 }
 
 model Post {
