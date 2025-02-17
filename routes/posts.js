@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { ValidationUtils } = require('../utils/backendUtils');
-
 const prisma = new PrismaClient();
 
 // Create a new post
