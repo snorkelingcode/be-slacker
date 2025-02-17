@@ -171,6 +171,7 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/chat', require('./routes/chat'));  // Add this line
 
 // Global error handler
 app.use((err, req, res, next) => {
