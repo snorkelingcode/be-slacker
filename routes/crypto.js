@@ -26,7 +26,12 @@ router.get('/top', async (req, res) => {
         }
 
         console.log('Fetching fresh crypto data from CoinMarketCap');
-        const response = await axios.get(`${process.env.CMC_BASE_URL}/cryptocurrency/listings/latest`, {
+        console.log('Using API Key:', process.env.COINMARKETCAP_API_KEY ? 'Present' : 'Missing');
+        console.log('Using Base URL:', process.env.CMC_BASE_URL);
+
+        const response = await axios({
+            method: 'GET',
+            url: `${process.env.CMC_BASE_URL}/cryptocurrency/listings/latest`,
             headers: {
                 'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY
             },
@@ -37,7 +42,11 @@ router.get('/top', async (req, res) => {
             }
         });
 
-        // Transform data to match frontend expectations
+        if (!response.data || !response.data.data) {
+            throw new Error('Invalid response from CoinMarketCap');
+        }
+
+        // Transform the data to match frontend expectations
         const transformedData = {
             data: response.data.data.map(crypto => ({
                 symbol: crypto.symbol,
@@ -55,18 +64,20 @@ router.get('/top', async (req, res) => {
         cryptoCache.data = transformedData;
         cryptoCache.timestamp = Date.now();
 
+        console.log('Successfully fetched and transformed crypto data');
         res.json(transformedData);
     } catch (error) {
         console.error('CoinMarketCap API Error:', {
             message: error.message,
             response: error.response?.data,
-            status: error.response?.status
+            stack: error.stack
         });
 
-        // Send a more frontend-friendly error
+        // Send a more detailed error response
         res.status(500).json({
             message: 'Error fetching cryptocurrency data',
-            error: error.message
+            error: error.message,
+            details: error.response?.data
         });
     }
 });
