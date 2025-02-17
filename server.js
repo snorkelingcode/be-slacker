@@ -171,7 +171,6 @@ app.post('/api/upload/:type', upload.single('file'), async (req, res) => {
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/upload', require('./routes/upload'));
 
 // Global error handler
 app.use((err, req, res, next) => {
