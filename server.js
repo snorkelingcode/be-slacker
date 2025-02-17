@@ -173,6 +173,7 @@ app.use('/api/posts', require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/ai/chat', require('./routes/chat'));
 app.use('/api/crypto', require('./routes/crypto'));
+app.use('/api/tracks', require('./routes/tracks'));
 
 // Global error handler
 app.use((err, req, res, next) => {
