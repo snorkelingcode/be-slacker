@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const { ValidationUtils } = require('../utils/backendUtils');
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -10,58 +9,41 @@ let cryptoCache = {
     timestamp: null
 };
 
-// Utility function to check if cache is valid
 const isCacheValid = () => {
     return cryptoCache.data && cryptoCache.timestamp && 
            (Date.now() - cryptoCache.timestamp < CACHE_DURATION);
 };
 
-// Get top cryptocurrencies
-// In your backend crypto.js
 router.get('/top', async (req, res) => {
     try {
         // Check cache first
         if (isCacheValid()) {
-            console.log('Returning cached crypto data');
             return res.json(cryptoCache.data);
         }
 
-        console.log('Fetching fresh crypto data from CoinMarketCap');
-
-        const response = await axios({
-            method: 'GET',
-            url: 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest',
-            headers: {
-                'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY,
-                'Accept': 'application/json'
-            },
-            params: {
-                start: 1,
-                limit: 100,
-                convert: 'USD'
+        // Fetch data from CoinGecko
+        const response = await axios.get(
+            'https://api.coingecko.com/api/v3/coins/markets', {
+                params: {
+                    vs_currency: 'usd',
+                    order: 'market_cap_desc',
+                    per_page: 100,
+                    page: 1,
+                    sparkline: false,
+                    price_change_percentage: '24h'
+                }
             }
-        });
+        );
 
-        // Log the response for debugging
-        console.log('CoinMarketCap Response:', {
-            status: response.status,
-            hasData: !!response.data,
-            dataLength: response.data?.data?.length
-        });
-
-        if (!response.data || !response.data.data) {
-            throw new Error('Invalid response from CoinMarketCap');
-        }
-
-        // Transform the data
+        // Transform data to match our frontend expectations
         const transformedData = {
-            data: response.data.data.map(crypto => ({
-                symbol: crypto.symbol,
+            data: response.data.map(crypto => ({
+                symbol: crypto.symbol.toUpperCase(),
                 name: crypto.name,
                 quote: {
                     USD: {
-                        price: crypto.quote.USD.price,
-                        percent_change_24h: crypto.quote.USD.percent_change_24h
+                        price: crypto.current_price,
+                        percent_change_24h: crypto.price_change_percentage_24h
                     }
                 }
             }))
@@ -71,24 +53,12 @@ router.get('/top', async (req, res) => {
         cryptoCache.data = transformedData;
         cryptoCache.timestamp = Date.now();
 
-        console.log('Successfully fetched and transformed crypto data');
         res.json(transformedData);
     } catch (error) {
-        // Enhanced error logging
-        console.error('CoinMarketCap API Error:', {
-            message: error.message,
-            response: {
-                status: error.response?.status,
-                data: error.response?.data,
-                headers: error.response?.headers
-            },
-            stack: error.stack
-        });
-
+        console.error('CoinGecko API Error:', error);
         res.status(500).json({
             message: 'Error fetching cryptocurrency data',
-            error: error.message,
-            details: error.response?.data
+            error: error.message
         });
     }
 });
