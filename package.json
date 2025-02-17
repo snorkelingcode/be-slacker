@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
-    "prisma": "^6.3.1",
-    "./routes/tracks": "./routes/tracks.js"
+    "prisma": "^6.3.1"
   }
 }
