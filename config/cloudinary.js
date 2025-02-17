@@ -15,12 +15,11 @@ const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'slacker',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'],
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif'],
         resource_type: 'auto',
         transformation: [{ quality: 'auto' }]
     }
 });
-
 // Configure Multer
 const upload = multer({ 
     storage: storage,

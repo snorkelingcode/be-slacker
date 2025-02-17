@@ -3,6 +3,8 @@ const express = require('express');
 const router = express.Router();
 const { uploadMiddleware } = require('../config/cloudinary');
 const { ValidationUtils } = require('../utils/backendUtils');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 // Upload endpoint for general media
 router.post('/', uploadMiddleware.single('file'), async (req, res) => {
@@ -27,6 +29,16 @@ router.post('/:type', uploadMiddleware.single('file'), async (req, res) => {
         const { type } = req.params;
         const { walletAddress } = req.body;
 
+        console.log('Upload Request:', { 
+            type, 
+            walletAddress, 
+            file: req.file ? {
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size
+            } : 'No file'
+        });
+
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
@@ -39,22 +51,32 @@ router.post('/:type', uploadMiddleware.single('file'), async (req, res) => {
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
 
         // Update user profile with new image URL
-        const prisma = new PrismaClient();
         const updateData = {};
         updateData[type === 'profile' ? 'profilePicture' : 'bannerPicture'] = req.file.path;
 
-        const user = await prisma.user.update({
-            where: { walletAddress: validatedWalletAddress },
-            data: updateData
-        });
+        try {
+            const user = await prisma.user.update({
+                where: { walletAddress: validatedWalletAddress },
+                data: updateData
+            });
 
-        res.json({ 
-            url: req.file.path,
-            user
-        });
+            res.json({ 
+                url: req.file.path,
+                user
+            });
+        } catch (updateError) {
+            console.error('User update error:', updateError);
+            res.status(500).json({ 
+                message: 'Error updating user profile',
+                error: updateError.message 
+            });
+        }
     } catch (error) {
         console.error('Upload error:', error);
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ 
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
