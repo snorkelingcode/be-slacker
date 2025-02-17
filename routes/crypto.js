@@ -17,6 +17,7 @@ const isCacheValid = () => {
 };
 
 // Get top cryptocurrencies
+// In your backend crypto.js
 router.get('/top', async (req, res) => {
     try {
         // Check cache first
@@ -26,14 +27,13 @@ router.get('/top', async (req, res) => {
         }
 
         console.log('Fetching fresh crypto data from CoinMarketCap');
-        console.log('Using API Key:', process.env.COINMARKETCAP_API_KEY ? 'Present' : 'Missing');
-        console.log('Using Base URL:', process.env.CMC_BASE_URL);
 
         const response = await axios({
             method: 'GET',
-            url: `${process.env.CMC_BASE_URL}/cryptocurrency/listings/latest`,
+            url: 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest',
             headers: {
-                'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY
+                'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY,
+                'Accept': 'application/json'
             },
             params: {
                 start: 1,
@@ -42,11 +42,18 @@ router.get('/top', async (req, res) => {
             }
         });
 
+        // Log the response for debugging
+        console.log('CoinMarketCap Response:', {
+            status: response.status,
+            hasData: !!response.data,
+            dataLength: response.data?.data?.length
+        });
+
         if (!response.data || !response.data.data) {
             throw new Error('Invalid response from CoinMarketCap');
         }
 
-        // Transform the data to match frontend expectations
+        // Transform the data
         const transformedData = {
             data: response.data.data.map(crypto => ({
                 symbol: crypto.symbol,
@@ -67,13 +74,17 @@ router.get('/top', async (req, res) => {
         console.log('Successfully fetched and transformed crypto data');
         res.json(transformedData);
     } catch (error) {
+        // Enhanced error logging
         console.error('CoinMarketCap API Error:', {
             message: error.message,
-            response: error.response?.data,
+            response: {
+                status: error.response?.status,
+                data: error.response?.data,
+                headers: error.response?.headers
+            },
             stack: error.stack
         });
 
-        // Send a more detailed error response
         res.status(500).json({
             message: 'Error fetching cryptocurrency data',
             error: error.message,
