@@ -1,100 +1,104 @@
 const express = require('express');
-const axios = require('axios');
 const router = express.Router();
+const OpenAI = require('openai');
+const { ValidationUtils } = require('../utils/backendUtils');
 
+// Initialize OpenAI with your API key
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
+
+// Chat endpoint
 router.post('/', async (req, res) => {
-    // Log the entire incoming request for debugging
-    console.log('Incoming AI Chat Request:', {
-        body: req.body,
-        headers: req.headers
-    });
-
-    const { messages, walletAddress } = req.body;
-
-    // Validate input
-    if (!messages || !Array.isArray(messages)) {
-        return res.status(400).json({ 
-            error: 'Invalid request. Messages must be an array.' 
-        });
-    }
-
     try {
-        const response = await axios.post('https://api.reploy.ai/v1/chat/completions', {
-            model: 'Reploy-Prod',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: 'You are a helpful AI assistant for a social media platform called Slacker. Keep responses concise, engaging, and relevant to social media interactions.' 
-                },
-                ...messages
-            ],
+        const { message, walletAddress } = req.body;
+
+        // Validate wallet address and sanitize message
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        const sanitizedMessage = ValidationUtils.sanitizeInput(message);
+
+        if (!sanitizedMessage) {
+            return res.status(400).json({ message: 'Message is required' });
+        }
+
+        // Create chat completion with GPT-4
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview", // or "gpt-3.5-turbo" for a more economical option
+            messages: [{
+                role: "user",
+                content: sanitizedMessage
+            }],
+            max_tokens: 500, // Adjust based on your needs
             temperature: 0.7,
-            max_tokens: 150
-        }, {
-            headers: {
-                'Authorization': `Bearer ${process.env.REPLOY_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 10000 // 10 second timeout
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0
         });
 
-        // Log the full Reploy API response
-        console.log('Reploy API Full Response:', JSON.stringify(response.data, null, 2));
+        // Extract the response
+        const aiResponse = completion.choices[0].message.content;
 
-        // Extract the AI's message, with fallback
-        const aiMessage = response.data.choices && response.data.choices[0] && response.data.choices[0].message 
-            ? response.data.choices[0].message.content 
-            : 'I apologize, but I could not generate a response.';
-
-        res.json({ 
-            message: aiMessage,
-            metadata: {
-                walletAddress,
-                timestamp: new Date().toISOString(),
-                tokenUsage: response.data.usage || {}
-            }
+        // Send response back to client
+        res.json({
+            message: aiResponse,
+            status: 'success'
         });
 
     } catch (error) {
-        // Detailed error logging
-        console.error('Reploy AI Error:', {
-            message: error.message,
-            response: error.response ? error.response.data : 'No response',
-            status: error.response ? error.response.status : 'No status',
-            headers: error.response ? error.response.headers : 'No headers'
+        console.error('ChatGPT API Error:', error);
+        res.status(500).json({
+            message: 'Error processing chat request',
+            error: error.message
         });
-
-        // Determine appropriate error response
-        if (error.response) {
-            // The request was made and the server responded with a status code
-            res.status(error.response.status).json({
-                error: 'AI service error',
-                details: error.response.data,
-                status: error.response.status
-            });
-        } else if (error.request) {
-            // The request was made but no response was received
-            res.status(503).json({
-                error: 'No response from AI service',
-                details: 'The AI service did not respond in time.'
-            });
-        } else {
-            // Something happened in setting up the request
-            res.status(500).json({
-                error: 'Error setting up AI request',
-                details: error.message
-            });
-        }
     }
 });
 
-// Optional: Add a health check endpoint
-router.get('/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        service: 'Reploy AI Chat',
-        timestamp: new Date().toISOString()
-    });
+// Chat stream endpoint for real-time responses
+router.post('/stream', async (req, res) => {
+    try {
+        const { message, walletAddress } = req.body;
+
+        // Validate wallet address and sanitize message
+        const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
+        const sanitizedMessage = ValidationUtils.sanitizeInput(message);
+
+        if (!sanitizedMessage) {
+            return res.status(400).json({ message: 'Message is required' });
+        }
+
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Create streaming chat completion
+        const stream = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{
+                role: "user",
+                content: sanitizedMessage
+            }],
+            stream: true,
+            max_tokens: 500,
+            temperature: 0.7
+        });
+
+        // Stream the response
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+                res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            }
+        }
+
+        res.write('data: [DONE]\n\n');
+        res.end();
+
+    } catch (error) {
+        console.error('ChatGPT Streaming Error:', error);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+    }
 });
 
 module.exports = router;
