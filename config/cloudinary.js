@@ -16,7 +16,7 @@ const storage = new CloudinaryStorage({
         folder: 'slacker',
         allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'mp3', 'mkv', 'wav'],
         resource_type: 'auto',
-        transformation: [{ quality: 'auto' }]
+        transformation: []
     }
 });
 
@@ -24,7 +24,7 @@ const storage = new CloudinaryStorage({
 const uploadMiddleware = multer({ 
     storage: storage,
     limits: {
-        fileSize: 100 * 1024 * 1024, // Increased to 100MB
+        fileSize: 50 * 1024 * 1024, // 50MB limit
         files: 1 // Only allow one file per request
     }
 }).single('file');

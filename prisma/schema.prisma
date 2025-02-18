@@ -94,31 +94,30 @@ model Notification {
 }
 
 model Track {
-  id              String      @id @default(cuid())
-  title           String
-  artist          String?
-  url             String      @unique
-  genre           String?
-  duration        Float?      @default(0)
+  id         String      @id @default(cuid())
+  title      String
+  url        String
+  artist     String
+  genre      String
+  fileType   String
+  playCount  Int         @default(0)
+  createdAt  DateTime    @default(now())
   
-  uploadedBy      String
-  uploader        User        @relation(fields: [uploadedBy], references: [id])
+  uploader   User        @relation(fields: [uploaderId], references: [id])
+  uploaderId String
   
-  createdAt       DateTime    @default(now())
-  
-  likes           TrackLike[]
-  playCount       Int         @default(0)
+  likes      TrackLike[]
 }
 
 model TrackLike {
-  id              String      @id @default(cuid())
-  createdAt       DateTime    @default(now())
-
-  userId          String
-  user            User        @relation(fields: [userId], references: [id])
-
-  trackId         String
-  track           Track       @relation(fields: [trackId], references: [id], onDelete: Cascade)
-
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  
+  track     Track    @relation(fields: [trackId], references: [id])
+  trackId   String
+  
   @@unique([userId, trackId])
 }

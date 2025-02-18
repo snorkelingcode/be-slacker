@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 // Upload a new track
 router.post('/upload', uploadMiddleware, async (req, res) => {
     try {
-        const { walletAddress, title, artist } = req.body;
+        const { walletAddress, title, artist, genre } = req.body;
 
         // Validate wallet address and file
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
@@ -18,13 +18,51 @@ router.post('/upload', uploadMiddleware, async (req, res) => {
             return res.status(400).json({ message: 'No audio file uploaded' });
         }
 
-        // Validate file size (optional additional check)
-        const maxSize = 100 * 1024 * 1024; // 100MB
-        if (req.file.size > maxSize) {
-            return res.status(400).json({ message: 'File size exceeds 100MB limit' });
+        // Validate file type
+        const allowedTypes = [
+            'audio/mpeg',   // MP3
+            'audio/wav',    // WAV
+            'audio/aiff',   // AIFF
+            'audio/mp4',    // M4A
+            'audio/ogg'     // OGG
+        ];
+
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            return res.status(400).json({ 
+                message: 'Unsupported audio file type' 
+            });
         }
 
-        // Rest of the upload logic...
+        // Find user by wallet address
+        const user = await prisma.user.findUnique({
+            where: { walletAddress: validatedWalletAddress }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Create track entry
+        const track = await prisma.track.create({
+            data: {
+                title: title || req.file.originalname,
+                url: req.file.path,
+                artist: artist || 'Unknown Artist',
+                genre: genre || 'Uncategorized',
+                uploaderId: user.id,
+                fileType: req.file.mimetype
+            },
+            include: {
+                uploader: {
+                    select: {
+                        username: true,
+                        walletAddress: true
+                    }
+                }
+            }
+        });
+
+        res.status(201).json(track);
     } catch (error) {
         console.error('Track upload error:', error);
         res.status(500).json({ 
