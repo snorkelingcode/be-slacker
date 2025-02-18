@@ -14,7 +14,7 @@ const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'slacker',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'mp3', 'mkv'],
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'mp3', 'mkv', 'wav'],
         resource_type: 'auto',
         transformation: [{ quality: 'auto' }]
     }
