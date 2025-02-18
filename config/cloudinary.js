@@ -24,7 +24,7 @@ const storage = new CloudinaryStorage({
 const uploadMiddleware = multer({ 
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB limit
+        fileSize: 100 * 1024 * 1024, // Increased to 100MB
         files: 1 // Only allow one file per request
     }
 }).single('file');

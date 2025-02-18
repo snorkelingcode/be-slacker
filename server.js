@@ -167,6 +167,13 @@ app.post('/api/upload/:type', uploadMiddleware, async (req, res) => {
     }
 });
 
+//increase the json and file payload size limits
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ 
+    limit: '100mb', 
+    extended: true 
+}));
+
 // Import and use routes
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));

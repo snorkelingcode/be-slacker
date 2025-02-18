@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 // Upload a new track
 router.post('/upload', uploadMiddleware, async (req, res) => {
     try {
-        const { walletAddress, title, artist, genre } = req.body;
+        const { walletAddress, title, artist } = req.body;
 
         // Validate wallet address and file
         const validatedWalletAddress = ValidationUtils.validateWalletAddress(walletAddress);
@@ -18,7 +18,13 @@ router.post('/upload', uploadMiddleware, async (req, res) => {
             return res.status(400).json({ message: 'No audio file uploaded' });
         }
 
-        // Rest of the code remains the same...
+        // Validate file size (optional additional check)
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        if (req.file.size > maxSize) {
+            return res.status(400).json({ message: 'File size exceeds 100MB limit' });
+        }
+
+        // Rest of the upload logic...
     } catch (error) {
         console.error('Track upload error:', error);
         res.status(500).json({ 
